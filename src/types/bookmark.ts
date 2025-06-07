@@ -15,6 +15,7 @@ export interface Bookmark {
   isPublic: boolean;
   extractedData?: ExtractedContent;
   aiAnalysis?: AIAnalysisResult;
+  relatedBookmarks?: Bookmark[];
 }
 
 // 폼 데이터 타입 (Bookmark 타입에서 선택적 필드 제거)
@@ -55,14 +56,7 @@ export interface AIAnalysisResult {
   }>;
   keyPoints: string[];
   difficulty: 'beginner' | 'intermediate' | 'advanced';
-  contentType:
-    | 'article'
-    | 'tutorial'
-    | 'video'
-    | 'news'
-    | 'research'
-    | 'blog'
-    | 'documentation';
+  contentType: 'article' | 'tutorial' | 'video' | 'news' | 'research' | 'blog' | 'documentation';
   readingGoals: string[];
   relatedTopics: string[];
   actionItems: string[];

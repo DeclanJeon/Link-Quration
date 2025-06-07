@@ -27,16 +27,20 @@ interface Bookmark {
 
 interface BookmarkCardProps {
   bookmark: Bookmark;
+  onClick?: () => void;
 }
 
-const BookmarkCard = ({ bookmark }: BookmarkCardProps) => {
+const BookmarkCard = ({ bookmark, onClick }: BookmarkCardProps) => {
   const [viewCount, setViewCount] = useState<number | null>(null);
 
   useEffect(() => {
     setViewCount(Math.floor(Math.random() * 100) + 10);
   }, []);
   return (
-    <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white border-slate-200">
+    <Card 
+      className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white border-slate-200 hover:cursor-pointer"
+      onClick={onClick}
+    >
       <div className="relative">
         <img
           src={bookmark.image}

@@ -4,6 +4,7 @@ import {
   VideoExtractionResult,
   WebExtractionResult,
 } from '@/types/extraction-types';
+
 import { NextRequest, NextResponse } from 'next/server';
 
 // 동적 import로 서버사이드에서만 로드

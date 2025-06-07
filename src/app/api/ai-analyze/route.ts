@@ -2,11 +2,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { OpenRouterClient } from '@/lib/openrouter';
 import { AnalysisRequest, AIAnalysisResult } from '@/types/ai-analyze';
+import { VideoAnalyzer } from '@/lib/media-analyzers/video-analyzer';
+import { MediaAIAnalyzer } from '@/lib/ai-analyzers/media-ai-analyzer';
+import {
+  MediaAnalysisResult,
+  MediaDetectionResult,
+  MediaType,
+  MediaPlatform,
+} from '@/types/media-analysis';
+
+// 🆕 확장된 요청 타입
+interface ExtendedAnalysisRequest extends AnalysisRequest {
+  isMediaContent?: boolean;
+  mediaUrl?: string;
+  mediaAnalysisOptions?: {
+    includeTimeline?: boolean;
+    includeTranscript?: boolean;
+    analysisDepth?: 'basic' | 'detailed' | 'comprehensive';
+    extractQuotes?: boolean;
+    generateChapters?: boolean;
+  };
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { extractedData, apiKey, modelId, analysisType }: AnalysisRequest =
-      await request.json();
+    const {
+      extractedData,
+      apiKey,
+      modelId,
+      analysisType,
+      isMediaContent,
+      mediaUrl,
+      mediaAnalysisOptions,
+    }: ExtendedAnalysisRequest = await request.json();
 
     if (!extractedData || !apiKey || !modelId) {
       return NextResponse.json(
@@ -15,38 +43,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`AI 분석 시작: ${modelId}, 타입: ${analysisType}`);
+    console.log(
+      `🧠 AI 분석 시작: ${modelId}, 타입: ${analysisType}, 미디어: ${isMediaContent}`
+    );
 
     const openRouter = new OpenRouterClient(apiKey);
+    let analysisResult: any;
 
-    let analysisResult: Partial<AIAnalysisResult>;
-
-    switch (analysisType) {
-      case 'summary':
-        analysisResult = await generateSummary(
-          openRouter,
-          modelId,
-          extractedData
-        );
-        break;
-      case 'tags':
-        analysisResult = await generateTags(openRouter, modelId, extractedData);
-        break;
-      case 'timeline':
-        analysisResult = await generateTimeline(
-          openRouter,
-          modelId,
-          extractedData
-        );
-        break;
-      case 'complete':
-      default:
-        analysisResult = await generateCompleteAnalysis(
-          openRouter,
-          modelId,
-          extractedData
-        );
-        break;
+    // 🎬 미디어 콘텐츠 분석 분기
+    if (isMediaContent && mediaUrl) {
+      analysisResult = await analyzeMediaContent(
+        openRouter,
+        modelId,
+        mediaUrl,
+        extractedData,
+        mediaAnalysisOptions
+      );
+    } else {
+      // 기존 텍스트 분석 로직
+      switch (analysisType) {
+        case 'summary':
+          analysisResult = await generateSummary(
+            openRouter,
+            modelId,
+            extractedData
+          );
+          break;
+        case 'tags':
+          analysisResult = await generateTags(
+            openRouter,
+            modelId,
+            extractedData
+          );
+          break;
+        case 'timeline':
+          analysisResult = await generateTimeline(
+            openRouter,
+            modelId,
+            extractedData
+          );
+          break;
+        case 'complete':
+        default:
+          analysisResult = await generateCompleteAnalysis(
+            openRouter,
+            modelId,
+            extractedData
+          );
+          break;
+      }
     }
 
     return NextResponse.json({
@@ -54,10 +99,10 @@ export async function POST(request: NextRequest) {
       data: analysisResult,
       analyzedAt: new Date().toISOString(),
       model: modelId,
+      isMediaAnalysis: isMediaContent || false,
     });
   } catch (error) {
-    console.error('AI 분석 오류:', error);
-
+    console.error('❌ AI 분석 오류:', error);
     return NextResponse.json(
       {
         error: 'AI 분석 중 오류가 발생했습니다.',
@@ -68,7 +113,168 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 완전한 AI 분석
+// 🆕 미디어 콘텐츠 분석 함수
+async function analyzeMediaContent(
+  openRouter: OpenRouterClient,
+  modelId: string,
+  mediaUrl: string,
+  extractedData: any,
+  options?: any
+): Promise<MediaAnalysisResult> {
+  console.log('🎬 미디어 콘텐츠 분석 시작...');
+
+  try {
+    // 1. 미디어 플랫폼 감지
+    const mediaDetection = detectMediaPlatform(mediaUrl);
+
+    if (!mediaDetection.isMedia) {
+      throw new Error('지원하지 않는 미디어 형식입니다.');
+    }
+
+    // 2. 미디어 기본 분석
+    const videoAnalyzer = new VideoAnalyzer();
+    let basicMediaAnalysis: MediaAnalysisResult;
+
+    switch (mediaDetection.platform) {
+      case 'youtube':
+      case 'vimeo':
+        basicMediaAnalysis = await videoAnalyzer.analyzeMediaContent(mediaUrl);
+        break;
+      default:
+        throw new Error(
+          `${mediaDetection.platform} 플랫폼은 아직 지원되지 않습니다.`
+        );
+    }
+
+    // 3. AI 고급 분석 (옵션에 따라)
+    const analysisDepth = options?.analysisDepth || 'detailed';
+
+    if (analysisDepth === 'basic') {
+      return basicMediaAnalysis;
+    }
+
+    // 4. AI 분석기로 고급 분석
+    const mediaAIAnalyzer = new MediaAIAnalyzer(openRouter, modelId);
+    const enhancedAnalysis = await mediaAIAnalyzer.analyzeMediaContentAdvanced(
+      basicMediaAnalysis
+    );
+
+    // 5. 추가 분석 옵션 처리
+    if (
+      options?.includeTranscript &&
+      !enhancedAnalysis.timeline.some((t) => t.transcript)
+    ) {
+      console.log('📝 트랜스크립트 포함 요청됨');
+      // 트랜스크립트가 없는 경우 추가 처리
+    }
+
+    if (options?.extractQuotes && enhancedAnalysis.notableQuotes.length === 0) {
+      console.log('💬 인용구 추출 시도...');
+      // 추가 인용구 추출 로직
+    }
+
+    console.log(
+      `✅ 미디어 분석 완료: ${enhancedAnalysis.timeline.length}개 구간, ${enhancedAnalysis.keyTopics.length}개 주제`
+    );
+
+    return enhancedAnalysis;
+  } catch (error) {
+    console.error('❌ 미디어 분석 실패:', error);
+
+    // 실패 시 기본 분석 결과 반환
+    return createFallbackMediaAnalysis(mediaUrl, extractedData, error as Error);
+  }
+}
+
+// 🆕 미디어 플랫폼 감지 함수
+function detectMediaPlatform(url: string): MediaDetectionResult {
+  const patterns = [
+    {
+      regex: /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
+      platform: 'youtube' as MediaPlatform,
+      mediaType: 'video' as MediaType,
+      features: [
+        'transcript',
+        'chapters',
+        'thumbnails',
+        'metadata',
+        'timeline_analysis',
+      ],
+    },
+    {
+      regex: /vimeo\.com\/(\d+)/,
+      platform: 'vimeo' as MediaPlatform,
+      mediaType: 'video' as MediaType,
+      features: ['metadata', 'thumbnails'],
+    },
+    {
+      regex: /(?:soundcloud\.com|spotify\.com)/,
+      platform: 'soundcloud' as MediaPlatform,
+      mediaType: 'audio' as MediaType,
+      features: ['metadata'],
+    },
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern.regex);
+    if (match) {
+      return {
+        isMedia: true,
+        mediaType: pattern.mediaType,
+        platform: pattern.platform,
+        mediaId: match[1],
+        confidence: 0.9,
+        supportedFeatures: pattern.features as any[],
+      };
+    }
+  }
+
+  return {
+    isMedia: false,
+    mediaType: 'unknown' as MediaType,
+    platform: 'generic' as MediaPlatform,
+    confidence: 0,
+    supportedFeatures: [],
+  };
+}
+
+// 🆕 실패 시 대체 분석 결과
+function createFallbackMediaAnalysis(
+  url: string,
+  extractedData: any,
+  error: Error
+): MediaAnalysisResult {
+  const detection = detectMediaPlatform(url);
+
+  return {
+    metadata: {
+      id: 'fallback',
+      title: extractedData.title || '미디어 분석 실패',
+      description: extractedData.description || error.message,
+      duration: 0,
+      durationFormatted: '알 수 없음',
+      platform: detection.platform,
+      mediaType: detection.mediaType,
+      quality: {},
+      language: 'ko',
+    },
+    timeline: [],
+    overallSummary: `미디어 분석 중 오류가 발생했습니다: ${error.message}`,
+    keyTopics: [],
+    difficulty: 'intermediate',
+    targetAudience: [],
+    learningObjectives: [],
+    relatedTopics: [],
+    actionItems: [],
+    notableQuotes: [],
+    chapters: [],
+    analysisTimestamp: new Date().toISOString(),
+    aiModel: 'fallback',
+    confidence: 0.1,
+  };
+}
+
+// 기존 텍스트 분석 함수들 (그대로 유지)
 async function generateCompleteAnalysis(
   openRouter: OpenRouterClient,
   modelId: string,
@@ -122,10 +328,7 @@ URL: ${extractedData.url}
           content:
             '당신은 웹 콘텐츠 분석 전문가입니다. 주어진 콘텐츠를 정확히 분석하고 구조화된 JSON 형식으로 응답합니다.',
         },
-        {
-          role: 'user',
-          content: prompt,
-        },
+        { role: 'user', content: prompt },
       ],
       modelId,
       {
@@ -134,7 +337,6 @@ URL: ${extractedData.url}
       }
     );
 
-    // JSON 파싱 시도
     const cleanResponse = response.replace(/```json\n?|\n?```/g, '').trim();
     const parsedResult = JSON.parse(cleanResponse);
 
@@ -142,7 +344,6 @@ URL: ${extractedData.url}
   } catch (error) {
     console.error('AI 분석 파싱 오류:', error);
 
-    // 파싱 실패 시 기본값 반환
     return {
       summary: '콘텐츠 요약을 생성할 수 없습니다.',
       tags: [extractedData.domain || 'web'],
@@ -158,7 +359,6 @@ URL: ${extractedData.url}
   }
 }
 
-// 요약만 생성
 async function generateSummary(
   openRouter: OpenRouterClient,
   modelId: string,
@@ -181,7 +381,6 @@ async function generateSummary(
   return { summary: response.trim() };
 }
 
-// 태그만 생성
 async function generateTags(
   openRouter: OpenRouterClient,
   modelId: string,
@@ -209,7 +408,6 @@ async function generateTags(
   return { tags: tags.slice(0, 5) };
 }
 
-// 타임라인만 생성
 async function generateTimeline(
   openRouter: OpenRouterClient,
   modelId: string,

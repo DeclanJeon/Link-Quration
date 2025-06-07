@@ -1,5 +1,7 @@
 "use client"
 
+"use client";
+
 import { useState, useEffect } from "react";
 import { Plus, Search, Filter, Share2, TrendingUp, Brain, Settings } from "lucide-react";
 import Link from "next/link";
@@ -9,21 +11,27 @@ import { Bookmark } from "@/types/bookmark";
 import { Badge } from "@/components/ui/badge";
 import BookmarkCard from "@/components/card/BookmarkCard";
 import AddBookmarkModal from "@/components/modal/AddBookmarkModal";
+import { BookmarkDetailModal } from "@/components/modal/BookmarkDetailModal";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 
 // 샘플 북마크 데이터
-import { sampleBookmarks, } from "@/mock/bookmark";
+import { sampleBookmarks } from "@/mock/bookmark";
 import { CATEGORIES } from "@/mock/categories";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useRouter } from "next/navigation";
 
 const Index = () => {
   const [bookmarks, setBookmarks] = useState(sampleBookmarks);
   const [selectedCategory, setSelectedCategory] = useState("전체");
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedBookmark, setSelectedBookmark] = useState<Bookmark | null>(null);
+  const [selectedBookmarkIndex, setSelectedBookmarkIndex] = useState<number>(-1);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewCount, setViewCount] = useState<number | null>(null);
+  const router = useRouter();
 
   // AI 설정 상태 확인
   const [hasApiKey, setHasApiKey] = useState<boolean>(false);
@@ -50,9 +58,66 @@ const Index = () => {
     const matchesCategory = selectedCategory === "전체" || bookmark.category === selectedCategory;
     const matchesSearch = bookmark.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          bookmark.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         bookmark.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+                         (bookmark.tags && bookmark.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())));
     return matchesCategory && matchesSearch;
   });
+
+  const handleBookmarkClick = (bookmark: Bookmark) => {
+    const index = filteredBookmarks.findIndex(b => b.id === bookmark.id);
+    setSelectedBookmark(bookmark);
+    setSelectedBookmarkIndex(index);
+    setIsDetailModalOpen(true);    
+    // URL 업데이트 (뒤로 가기/앞으로 가기 지원)
+    window.history.pushState({}, '', `?bookmark=${bookmark.id}`);
+  };
+
+  const handleNavigate = (direction: 'prev' | 'next') => {
+    if (!selectedBookmark) return;
+    
+    const newIndex = direction === 'prev' ? selectedBookmarkIndex - 1 : selectedBookmarkIndex + 1;
+    
+    if (newIndex >= 0 && newIndex < filteredBookmarks.length) {
+      const newBookmark = filteredBookmarks[newIndex];
+      setSelectedBookmark(newBookmark);
+      setSelectedBookmarkIndex(newIndex);
+      window.history.pushState({}, '', `?bookmark=${newBookmark.id}`);
+    }
+  };
+
+  // URL에서 북마크 ID를 읽어 상세 보기 열기
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const bookmarkId = params.get('bookmark');
+      
+      if (bookmarkId) {
+        const bookmark = bookmarks.find(b => b.id === parseInt(bookmarkId));
+        if (bookmark) {
+          setSelectedBookmark(bookmark);
+          setIsDetailModalOpen(true);
+        }
+      } else {
+        setIsDetailModalOpen(false);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [bookmarks]);
+
+  const handleEditBookmark = (id: number) => {
+    // TODO: 북마크 수정 기능 구현
+    console.log('Edit bookmark:', id);
+  };
+
+  const handleDeleteBookmark = (id: number) => {
+    // TODO: 북마크 삭제 기능 구현
+    if (window.confirm('정말 이 북마크를 삭제하시겠습니까?')) {
+      setBookmarks(prev => prev.filter(b => b.id !== id));
+      setIsDetailModalOpen(false);
+    }
+  }; 
+  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -173,11 +238,37 @@ const Index = () => {
             </div>
 
             {/* 북마크 그리드 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredBookmarks.map((bookmark) => (
-                <BookmarkCard key={bookmark.id} bookmark={bookmark} />
-              ))}
-            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredBookmarks.map((bookmark) => (
+              <div 
+                key={bookmark.id} 
+                id={`bookmark-${bookmark.id}`}
+                className="hover:opacity-90 transition-opacity"
+              >
+                <BookmarkCard 
+                  bookmark={bookmark} 
+                  onClick={() => handleBookmarkClick(bookmark)}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* 북마크 상세 모달 */}
+          {selectedBookmark && (
+            <BookmarkDetailModal
+              bookmark={selectedBookmark}
+              isOpen={isDetailModalOpen}
+              onClose={() => {
+                setIsDetailModalOpen(false);
+                window.history.pushState({}, '', window.location.pathname);
+              }}
+              onEdit={handleEditBookmark}
+              onDelete={handleDeleteBookmark}
+              onNavigate={handleNavigate}
+              hasPrevious={selectedBookmarkIndex > 0}
+              hasNext={selectedBookmarkIndex < filteredBookmarks.length - 1}
+            />
+          )}
 
             {filteredBookmarks.length === 0 && (
               <div className="text-center py-12">
