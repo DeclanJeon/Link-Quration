@@ -11,19 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-interface Bookmark {
-  id: number;
-  title: string;
-  description: string;
-  url: string;
-  image: string;
-  tags: string[];
-  category: string;
-  createdAt: string;
-  author: string;
-  readTime: string;
-  isPublic: boolean;
-}
+import { Bookmark } from "@/types/bookmark";
 
 interface BookmarkCardProps {
   bookmark: Bookmark;

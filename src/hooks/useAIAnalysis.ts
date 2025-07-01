@@ -27,7 +27,7 @@ export const useAIAnalysis = () => {
   }, []);
 
   const performAIAnalysis = useCallback(
-    async (extractedData: ExtractedContent) => {
+    async (extractedData: ExtractedContent, mode: 'quick' | 'full' = 'full') => {
       setIsAiAnalyzing(true);
       setAiError('');
 
@@ -51,7 +51,7 @@ export const useAIAnalysis = () => {
             extractedData,
             apiKey,
             modelId: selectedModel.id,
-            analysisType: 'complete',
+            analysisType: mode === 'quick' ? 'quick' : 'complete',
           }),
         });
 

@@ -36,7 +36,8 @@ export interface UseAIAnalysisReturn {
   hasAISetup: boolean;
   selectedModel: any;
   performAIAnalysis: (
-    extractedData: ExtractedContent
+    extractedData: ExtractedContent,
+    mode?: 'quick' | 'full'
   ) => Promise<AIAnalysisResult>;
   resetAIAnalysis: () => void;
 }

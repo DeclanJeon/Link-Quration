@@ -17,14 +17,7 @@ export interface AIAnalysisResult {
   }>;
   keyPoints: string[];
   difficulty: 'beginner' | 'intermediate' | 'advanced';
-  contentType:
-    | 'article'
-    | 'tutorial'
-    | 'video'
-    | 'news'
-    | 'research'
-    | 'blog'
-    | 'documentation';
+  contentType: 'article' | 'tutorial' | 'video' | 'news' | 'research' | 'blog' | 'documentation';
   readingGoals: string[];
   relatedTopics: string[];
   actionItems: string[];

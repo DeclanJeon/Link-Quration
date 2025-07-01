@@ -1,7 +1,7 @@
-// src/hooks/useMediaAnalysis.ts 수정
+// src/hooks/useMediaAnalysis.ts 수정된 버전
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { MediaDetector } from '@/lib/media-analyzers/media-detector';
 import {
   MediaAnalysisResult,
@@ -21,49 +21,59 @@ export const useMediaAnalysis = () => {
     detection: null,
   });
 
-  // 🆕 자동 미디어 감지
-  const detectMedia = useCallback(
-    async (url: string): Promise<MediaDetectionResult | null> => {
-      if (!url.trim()) return null;
+  // 중복 분석 방지를 위한 ref 추가
+  const abortControllerRef = useRef<AbortController | null>(null);
 
+  // 진행률 업데이트 함수
+  const updateProgress = useCallback((stage: AnalysisStage, progress: number, message: string) => {
+    setState(prev => ({
+      ...prev,
+      progress: {
+        ...prev.progress,
+        stage,
+        progress,
+        message,
+      } as MediaAnalysisProgress,
+    }));
+  }, []);
+
+  // 🆕 자동 미디어 감지 (개선)
+  const detectMedia = useCallback(async (url: string): Promise<MediaDetectionResult | null> => {
+    if (!url.trim()) return null;
+
+    try {
+      setState((prev) => ({ ...prev, error: null }));
+
+      console.log('🔍 미디어 감지 시작:', url);
+
+      // URL 유효성 검사 추가
       try {
-        setState((prev) => ({ ...prev, error: null }));
-
-        console.log('🔍 미디어 감지 시작:', url);
-
-        // 클라이언트에서 직접 감지 (API 호출 없이)
-        const detection = MediaDetector.detectMedia(url);
-
-        setState((prev) => ({ ...prev, detection }));
-
-        console.log('✅ 미디어 감지 결과:', detection);
-        return detection;
-      } catch (error) {
-        console.error('❌ 미디어 감지 실패:', error);
-        const mediaError: MediaAnalysisError = {
-          code: 'MEDIA_NOT_FOUND',
-          message: error instanceof Error ? error.message : '미디어 감지 실패',
-          stage: 'detecting',
-        };
-
-        setState((prev) => ({ ...prev, error: mediaError }));
-        return null;
+        new URL(url);
+      } catch {
+        throw new Error('유효하지 않은 URL입니다.');
       }
-    },
-    []
-  );
 
-  // 🆕 URL 변경 시 자동 감지
-  const autoDetectMedia = useCallback(
-    async (url: string) => {
-      if (url && url.trim().length > 0) {
-        await detectMedia(url);
-      }
-    },
-    [detectMedia]
-  );
+      // 클라이언트에서 직접 감지
+      const detection = MediaDetector.detectMedia(url);
 
-  // 🧠 전체 미디어 분석
+      setState((prev) => ({ ...prev, detection }));
+
+      console.log('✅ 미디어 감지 결과:', detection);
+      return detection;
+    } catch (error) {
+      console.error('❌ 미디어 감지 실패:', error);
+      const mediaError: MediaAnalysisError = {
+        code: 'MEDIA_NOT_FOUND',
+        message: error instanceof Error ? error.message : '미디어 감지 실패',
+        stage: 'detecting',
+      };
+
+      setState((prev) => ({ ...prev, error: mediaError, detection: null }));
+      return null;
+    }
+  }, []);
+
+  // 🧠 전체 미디어 분석 (개선)
   const analyzeMedia = useCallback(
     async (
       url: string,
@@ -74,15 +84,25 @@ export const useMediaAnalysis = () => {
         includeTranscript?: boolean;
         analysisDepth?: 'basic' | 'detailed' | 'comprehensive';
         extractQuotes?: boolean;
-      }
+      },
     ): Promise<MediaAnalysisResult | null> => {
       console.log('🚀 analyzeMedia 함수 호출됨:', { url, modelId, options });
+
+      // 이전 요청 취소
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // 새 AbortController 생성
+      abortControllerRef.current = new AbortController();
+      const { signal } = abortControllerRef.current;
 
       try {
         setState((prev) => ({
           ...prev,
           isAnalyzing: true,
           error: null,
+          result: null, // 이전 결과 초기화
           progress: {
             stage: 'detecting',
             progress: 10,
@@ -91,13 +111,10 @@ export const useMediaAnalysis = () => {
         }));
 
         // 1. 미디어 감지
-        console.log('🔍 미디어 감지 시작...');
         let detection = state.detection;
         if (!detection) {
           detection = await detectMedia(url);
         }
-
-        console.log('📋 감지 결과:', detection);
 
         if (!detection?.isMedia) {
           throw new Error('지원하지 않는 미디어 형식입니다.');
@@ -113,18 +130,23 @@ export const useMediaAnalysis = () => {
           },
         }));
 
-        // 3. API 요청 준비
+        // 3. API 요청
         const requestBody = {
           extractedData: {
             url,
-            title: '미디어 분석',
+            title: '미디어 분석', // detection.title이 없으므로 기본값 사용
             domain: new URL(url).hostname,
           },
           apiKey,
           modelId,
           isMediaContent: true,
           mediaUrl: url,
-          mediaAnalysisOptions: options,
+          mediaAnalysisOptions: {
+            ...options,
+            platform: detection.platform,
+            mediaType: detection.mediaType,
+            mediaId: detection.mediaId,
+          },
         };
 
         console.log('📤 API 요청 데이터:', requestBody);
@@ -139,8 +161,6 @@ export const useMediaAnalysis = () => {
           },
         }));
 
-        console.log('🌐 API 호출 시작...');
-
         const response = await fetch('/api/ai-analyze', {
           method: 'POST',
           headers: {
@@ -148,14 +168,12 @@ export const useMediaAnalysis = () => {
             Accept: 'application/json',
           },
           body: JSON.stringify(requestBody),
+          signal, // AbortController signal 추가
         });
 
-        console.log('📡 API 응답 상태:', response.status, response.statusText);
-
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('❌ API 에러 응답:', errorText);
-          throw new Error(`API 호출 실패: ${response.status} - ${errorText}`);
+          const errorData = await response.json().catch(() => ({ error: response.statusText }));
+          throw new Error(errorData.error || `API 호출 실패: ${response.status}`);
         }
 
         const data = await response.json();
@@ -171,48 +189,16 @@ export const useMediaAnalysis = () => {
           },
         }));
 
-        // 임시 결과 생성 (API가 완전히 구현되지 않은 경우)
-        const mockResult: MediaAnalysisResult = {
+        // 미디어 분석 결과 병합
+        const result: MediaAnalysisResult = {
+          ...data.data,
           metadata: {
-            id: detection.mediaId || 'test',
-            title: '테스트 미디어',
-            description: '미디어 분석 테스트',
-            duration: 300,
-            durationFormatted: '5분',
+            ...data.data.metadata,
             platform: detection.platform,
             mediaType: detection.mediaType,
-            quality: {},
-            language: 'ko',
+            mediaId: detection.mediaId,
           },
-          timeline: [
-            {
-              id: 'segment-1',
-              startTime: { seconds: 0, formatted: '0:00' },
-              endTime: { seconds: 60, formatted: '1:00' },
-              duration: 60,
-              title: '시작 부분',
-              description: '미디어 시작',
-              summary: '테스트 세그먼트입니다.',
-              keyPoints: ['테스트 포인트 1', '테스트 포인트 2'],
-              importance: 'high' as const,
-              tags: ['test'],
-            },
-          ],
-          overallSummary: '이것은 테스트 분석 결과입니다.',
-          keyTopics: ['테스트', '미디어', '분석'],
-          difficulty: 'intermediate',
-          targetAudience: ['개발자'],
-          learningObjectives: ['미디어 분석 이해하기'],
-          relatedTopics: ['AI', '분석'],
-          actionItems: ['테스트 실행하기'],
-          notableQuotes: [],
-          chapters: [],
-          analysisTimestamp: new Date().toISOString(),
-          aiModel: modelId,
-          confidence: 0.8,
         };
-
-        const result = data.data || mockResult;
 
         setState((prev) => ({
           ...prev,
@@ -228,6 +214,12 @@ export const useMediaAnalysis = () => {
         console.log('✅ 분석 완료:', result);
         return result;
       } catch (error) {
+        // 취소된 요청은 에러로 처리하지 않음
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.log('🛑 분석이 취소되었습니다.');
+          return null;
+        }
+
         console.error('❌ analyzeMedia 에러:', error);
 
         const mediaError: MediaAnalysisError = {
@@ -246,65 +238,67 @@ export const useMediaAnalysis = () => {
         return null;
       }
     },
-    [detectMedia, state.detection, state.progress?.stage]
+    [detectMedia, state.detection],
   );
 
-  // 🎯 타임라인만 분석
+  // 🎯 타임라인만 분석 (개선)
   const analyzeTimeline = useCallback(
     async (
       url: string,
-      apiKey: string,
       modelId: string,
       options?: {
         segmentDuration?: number;
         analysisDepth?: 'basic' | 'detailed' | 'comprehensive';
-      }
-    ): Promise<any> => {
+      },
+    ): Promise<MediaAnalysisResult['timeline'] | null> => {
       try {
         setState((prev) => ({
           ...prev,
           isAnalyzing: true,
           error: null,
-          progress: {
-            stage: 'generating_timeline',
-            progress: 0,
-            message: '타임라인 분석 시작...',
-          },
         }));
 
-        const response = await fetch('/api/media-timeline', {
+        const response = await fetch('/api/analyze-timeline', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({
-            mediaUrl: url,
-            apiKey,
+            url,
             modelId,
             options,
           }),
         });
 
         if (!response.ok) {
-          throw new Error('타임라인 분석 실패');
+          const errorData = await response.json().catch(() => ({ error: response.statusText }));
+          throw new Error(errorData.error || '타임라인 분석 실패');
         }
 
         const data = await response.json();
 
+        // 기존 result에 타임라인 업데이트
         setState((prev) => ({
           ...prev,
           isAnalyzing: false,
+          result: prev.result
+            ? {
+                ...prev.result,
+                timeline: data.data.timeline,
+              }
+            : null,
           progress: {
             stage: 'completed',
             progress: 100,
-            message: '타임라인 분석 완료!',
+            message: '타임라인 분석 완료',
           },
         }));
 
-        return data.data;
+        return data.data.timeline;
       } catch (error) {
         const mediaError: MediaAnalysisError = {
           code: 'ANALYSIS_FAILED',
-          message:
-            error instanceof Error ? error.message : '타임라인 분석 실패',
+          message: error instanceof Error ? error.message : '타임라인 분석 실패',
           stage: 'generating_timeline',
         };
 
@@ -312,37 +306,23 @@ export const useMediaAnalysis = () => {
           ...prev,
           isAnalyzing: false,
           error: mediaError,
+          progress: null,
         }));
 
         return null;
       }
     },
-    []
+    [],
   );
 
-  // 진행률 업데이트 헬퍼
-  const updateProgress = useCallback(
-    (
-      stage: AnalysisStage,
-      progress: number,
-      message: string,
-      estimatedTimeRemaining?: number
-    ) => {
-      setState((prev) => ({
-        ...prev,
-        progress: {
-          stage,
-          progress,
-          message,
-          estimatedTimeRemaining,
-        },
-      }));
-    },
-    []
-  );
-
-  // 🔄 상태 리셋
+  // 🔄 상태 리셋 (개선)
   const resetAnalysis = useCallback(() => {
+    // 진행 중인 요청 취소
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
     setState({
       isAnalyzing: false,
       progress: null,
@@ -352,18 +332,21 @@ export const useMediaAnalysis = () => {
     });
   }, []);
 
-  // 📊 분석 통계
+  // 📊 분석 통계 (개선)
   const getAnalysisStats = useCallback(() => {
     if (!state.result) return null;
 
     return {
       totalDuration: state.result.metadata.duration,
+      totalDurationFormatted: state.result.metadata.durationFormatted,
       timelineSegments: state.result.timeline.length,
       keyTopics: state.result.keyTopics.length,
       actionItems: state.result.actionItems.length,
       notableQuotes: state.result.notableQuotes.length,
-      chapters: state.result.chapters.length,
+      chapters: state.result.chapters?.length || 0,
       confidence: state.result.confidence,
+      platform: state.result.metadata.platform,
+      mediaType: state.result.metadata.mediaType,
     };
   }, [state.result]);
 
@@ -377,37 +360,73 @@ export const useMediaAnalysis = () => {
 
     // 액션
     detectMedia,
-    autoDetectMedia, // 🆕 자동 감지
+    autoDetectMedia: detectMedia, // autoDetectMedia를 detectMedia로 통일
     analyzeMedia,
     analyzeTimeline,
     resetAnalysis,
+    updateProgress, // 진행률 업데이트 함수 노출
 
     // 유틸리티
     getAnalysisStats,
   };
 };
 
-// 🎯 간단한 미디어 감지 훅
+// 🎯 간단한 미디어 감지 훅 (개선)
 export const useMediaDetection = () => {
   const [detection, setDetection] = useState<MediaDetectionResult | null>(null);
   const [isDetecting, setIsDetecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { analyzeMedia } = useMediaAnalysis();
+  const [progress, setProgress] = useState<{stage: string; progress: number; message: string} | null>(null);
+
+  const updateProgress = useCallback((stage: string, progress: number, message: string) => {
+    setProgress({ stage, progress, message });
+  }, []);
 
   const detectMedia = useCallback(async (url: string) => {
-    if (!url.trim()) return null;
+    if (!url.trim()) {
+      setDetection(null);
+      return null;
+    }
 
     setIsDetecting(true);
+    setError(null);
+
     try {
+      // URL 유효성 검사
+      new URL(url);
+
       console.log('🔍 간단 미디어 감지:', url);
       const result = MediaDetector.detectMedia(url);
       setDetection(result);
       return result;
     } catch (error) {
       console.error('미디어 감지 실패:', error);
+      setError(error instanceof Error ? error.message : '미디어 감지 실패');
+      setDetection(null);
       return null;
     } finally {
       setIsDetecting(false);
     }
   }, []);
 
-  return { detection, isDetecting, detectMedia };
+  // URL 변경 시 자동 감지
+  const autoDetectMedia = useCallback(
+    (url: string) => {
+      detectMedia(url);
+    },
+    [detectMedia],
+  );
+
+  return {
+    detection,
+    isDetecting,
+    detectMedia,
+    autoDetectMedia,
+    error,
+    progress,
+    updateProgress,
+    // 미디어 분석 훅의 함수들도 포함
+    analyzeMedia,
+  };
 };

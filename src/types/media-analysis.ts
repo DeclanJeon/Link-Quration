@@ -195,13 +195,15 @@ export interface MediaAnalysisError {
 }
 
 export type MediaErrorCode =
-  | 'UNSUPPORTED_PLATFORM'
-  | 'MEDIA_NOT_FOUND'
-  | 'TRANSCRIPT_UNAVAILABLE'
-  | 'API_LIMIT_EXCEEDED'
   | 'ANALYSIS_FAILED'
+  | 'MEDIA_NOT_FOUND'
+  | 'INVALID_URL'
+  | 'API_ERROR'
   | 'NETWORK_ERROR'
-  | 'INVALID_URL';
+  | 'UNSUPPORTED_MEDIA'
+  | 'PERMISSION_DENIED'
+  | 'TIMEOUT'
+  | 'TIMELINE_ANALYSIS_FAILED';
 
 // 훅에서 사용할 상태 타입
 export interface UseMediaAnalysisState {
@@ -210,6 +212,7 @@ export interface UseMediaAnalysisState {
   result: MediaAnalysisResult | null;
   error: MediaAnalysisError | null;
   detection: MediaDetectionResult | null;
+  updateProgress?: (stage: string, progress: number, message: string) => void;
 }
 
 // API 응답 타입들

@@ -1,6 +1,6 @@
 export const sampleBookmarks = [
   {
-    id: 1,
+    id: '1',
     title: 'React 18의 새로운 기능들',
     description:
       'React 18에서 추가된 Concurrent Features, Suspense, 그리고 새로운 Hooks에 대한 완벽 가이드',
@@ -9,12 +9,13 @@ export const sampleBookmarks = [
     tags: ['React', 'JavaScript', '프론트엔드'],
     category: '개발',
     createdAt: '2024-06-01',
+    updatedAt: '2024-06-01',
     author: 'React Team',
     readTime: '8분',
     isPublic: true,
   },
   {
-    id: 2,
+    id: '2',
     title: '디자인 시스템 구축하기',
     description:
       '확장 가능한 디자인 시스템을 구축하기 위한 실전 가이드와 베스트 프랙티스',
@@ -23,26 +24,13 @@ export const sampleBookmarks = [
     tags: ['디자인', '시스템', 'UI/UX'],
     category: '디자인',
     createdAt: '2024-06-02',
+    updatedAt: '2024-06-02',
     author: 'Design Team',
     readTime: '12분',
     isPublic: false,
   },
   {
-    id: 3,
-    title: 'AI와 머신러닝의 미래',
-    description:
-      '인공지능 기술의 현재와 미래 전망, 그리고 우리 삶에 미칠 영향에 대한 깊이 있는 분석',
-    url: 'https://openai.com/research',
-    image: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=400',
-    tags: ['AI', '머신러닝', '기술'],
-    category: '기술',
-    createdAt: '2024-06-03',
-    author: 'OpenAI',
-    readTime: '15분',
-    isPublic: true,
-  },
-  {
-    id: 4,
+    id: '4',
     title: '효율적인 팀 커뮤니케이션',
     description:
       '원격 근무 환경에서 팀 생산성을 높이는 커뮤니케이션 전략과 도구들',
@@ -51,6 +39,22 @@ export const sampleBookmarks = [
     tags: ['팀워크', '커뮤니케이션', '생산성'],
     category: '비즈니스',
     createdAt: '2024-06-04',
+    updatedAt: '2024-06-04',
+    author: 'Slack',
+    readTime: '6분',
+    isPublic: true,
+  },
+  {
+    id: '5',
+    title: '효율적인 팀 커뮤니케이션',
+    description:
+      '원격 근무 환경에서 팀 생산성을 높이는 커뮤니케이션 전략과 도구들',
+    url: 'https://slack.com/blog',
+    image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400',
+    tags: ['팀워크', '커뮤니케이션', '생산성'],
+    category: '비즈니스',
+    createdAt: '2024-06-04',
+    updatedAt: '2024-06-04',
     author: 'Slack',
     readTime: '6분',
     isPublic: true,

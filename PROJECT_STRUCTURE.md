@@ -15,7 +15,14 @@
 │   │   ├── api/
 │   │   │   ├── ai-analyze/
 │   │   │   │   └── route.ts
+│   │   │   ├── bookmarks/
+│   │   │   │   └── [id]/
+│   │   │   │       └── route.ts
 │   │   │   ├── extract-content/
+│   │   │   │   └── route.ts
+│   │   │   ├── media-detect/
+│   │   │   │   └── route.ts
+│   │   │   ├── media-timeline/
 │   │   │   │   └── route.ts
 │   │   │   └── analize-url.js
 │   │   ├── settings/
@@ -129,11 +136,20 @@
 
 ## 주요 디렉토리 설명
 
+### `/src/constants`
+상수 값 정의 (현재 비어있음)
+
+### `/src/contexts`
+React 컨텍스트 (현재 비어있음)
+
 ### `/src/app`
 Next.js 13+의 App Router를 사용하는 페이지와 API 라우트가 위치합니다.
 - `api/`: API 엔드포인트
   - `ai-analyze/route.ts`: URL을 분석하여 AI 기반 메타데이터 추출
+  - `bookmarks/[id]/route.ts`: 특정 북마크에 대한 API 엔드포인트
   - `extract-content/route.ts`: 웹 페이지에서 콘텐츠 추출
+  - `media-detect/route.ts`: 미디어 콘텐츠 감지 및 분석
+  - `media-timeline/route.ts`: 미디어 타임라인 관련 API
   - `analize-url.js`: 레거시 URL 분석기 (구현 예정)
 - `settings/page.tsx`: 애플리케이션 설정 페이지
 - `layout.tsx`: 전역 레이아웃 컴포넌트
@@ -145,10 +161,12 @@ Next.js 13+의 App Router를 사용하는 페이지와 API 라우트가 위치�
 #### `/modal`
 북마크 추가/수정 관련 모달 컴포넌트
 - `AddBookmarkModal.tsx`: 북마크 추가/수정 메인 모달
+- `BookmarkDetailModal.tsx`: 북마크 상세 정보 표시 모달
 - `tabs/`: 모달 내 탭 컴포넌트들
   - `AIAnalysisTab.tsx`: AI 분석 결과 표시
   - `AdvancedTab.tsx`: 고급 설정 옵션
   - `BasicInfoTab.tsx`: 기본 정보 입력
+  - `MediaAnalysisTab.tsx`: 미디어 분석 결과 표시
   - `PreviewTab.tsx`: 북마크 미리보기
 
 #### `/ai`
@@ -178,6 +196,7 @@ AI 관련 컴포넌트
 - `useAIAnalysis.ts`: AI 분석 관련 로직 처리
 - `useBookmarkForm.ts`: 북마크 폼 상태 관리
 - `useContentExtraction.ts`: 웹 페이지 콘텐츠 추출
+- `useMediaDetection.ts`: 미디어 콘텐츠 감지 훅
 - `use-mobile.ts`: 반응형 디자인을 위한 모바일 감지
 - `use-toast.ts`: 사용자 알림 표시
 
@@ -190,6 +209,8 @@ AI 분석 관련 유틸리티
 
 #### `/media-analyzers`
 미디어 파일 분석 유틸리티
+- `audio-analyzer.ts`: 오디오 콘텐츠 분석
+- `media-detector.ts`: 미디어 콘텐츠 감지
 - `video-analyzer.ts`: 비디오 메타데이터 분석
 
 #### `/scrapers`
@@ -197,21 +218,18 @@ AI 분석 관련 유틸리티
 - `multi-strategy-scraper.ts`: 다양한 전략을 사용한 웹 스크래퍼
 
 #### 기타 유틸리티
-- `bookmark-utils.ts`: 북마크 관련 유틸리티 함수
+- `openrouter.ts`: OpenRouter API 연동 유틸리티
+- `utils.ts`: 공통 유틸리티 함수
 - `openrouter.ts`: OpenRouter API 클라이언트
 - `utils.ts`: 공통 유틸리티 함수
 
 ### `/src/mock`
-개발용 모의 데이터
+모의 데이터 파일들
 - `bookmark.ts`: 북마크 모의 데이터
 - `categories.ts`: 카테고리 모의 데이터
 
-### `/src/types`
-TypeScript 타입 정의
-- `ai-analyze.ts`: AI 분석 관련 타입
-- `bookmark-form.ts`: 북마크 폼 타입
-- `bookmark.ts`: 북마크 데이터 모델 타입
-- `common.ts`: 공통 타입
+### `/src/services`
+서비스 레이어 (현재 비어있음)
 - `extraction-types.ts`: 콘텐츠 추출 관련 타입
 - `extraction.ts`: 추출 기능 타입
 - `openrouter.ts`: OpenRouter API 응답 타입
