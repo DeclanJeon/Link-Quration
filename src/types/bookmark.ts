@@ -19,10 +19,14 @@ export interface Bookmark {
   author: string;
   readTime: string;
   isPublic: boolean;
+  viewCount?: number;
+  isArchived?: boolean;  // 추가된 속성
+  lastVisited?: string;  // 추가된 속성
   extractedData?: ExtractedContent;
   aiAnalysis?: AIAnalysisResult;
   relatedBookmarks?: Bookmark[];
   mediaAnalysis?: MediaAnalysisData;
+  readingProgress?: number; // 추가: 진행률 속성
 }
 
 // 폼 데이터 타입 (Bookmark 타입에서 선택적 필드 제거)
